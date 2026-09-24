@@ -1,5 +1,5 @@
 {
-  "name": "audesp-xml-converter",
+  "name": "converter_xml_audesp",
   "private": true,
   "version": "1.0.0",
   "type": "module",
