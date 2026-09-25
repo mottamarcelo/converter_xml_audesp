@@ -178,10 +178,39 @@ function montarDados(descritor, domicilios) {
 /**
  * Cria e baixa o arquivo XLSX.
  */
-function gerarExcel(dados, nomeArquivo) {
-  const worksheet = XLSX.utils.aoa_to_sheet(
-    dados
-  );
+function gerarExcel(descritor, domicilios, nomeArquivo) {
+  const dados = [];
+
+  // Cabeçalho com os dados do Descritor
+  Object.entries(descritor).forEach(([campo, valor]) => {
+    dados.push([campo, valor]);
+  });
+
+  // Linha em branco separando cabeçalho dos registros
+  dados.push([]);
+
+  // Colunas dos domicílios bancários
+  const colunasDomicilio = [];
+
+  domicilios.forEach((domicilio) => {
+    Object.keys(domicilio).forEach((campo) => {
+      if (!colunasDomicilio.includes(campo)) {
+        colunasDomicilio.push(campo);
+      }
+    });
+  });
+
+  // Cabeçalho da tabela
+  dados.push(colunasDomicilio);
+
+  // Registros
+  domicilios.forEach((domicilio) => {
+    dados.push(
+      colunasDomicilio.map((coluna) => domicilio[coluna] ?? "")
+    );
+  });
+
+  const worksheet = XLSX.utils.aoa_to_sheet(dados);
 
   const workbook = XLSX.utils.book_new();
 
@@ -191,56 +220,14 @@ function gerarExcel(dados, nomeArquivo) {
     "DomiciliosBancarios"
   );
 
-  // Congelar cabeçalho
-  worksheet["!freeze"] = {
-    xSplit: 0,
-    ySplit: 1
-  };
+  // Largura das colunas
+  worksheet["!cols"] = colunasDomicilio.map(() => ({
+    wch: 20
+  }));
 
-  // Filtro automático
-  const range = XLSX.utils.decode_range(
-    worksheet["!ref"]
-  );
-
-  worksheet["!autofilter"] = {
-    ref: XLSX.utils.encode_range(range)
-  };
-
-  // Ajuste automático das colunas
-  const larguras = dados[0].map(
-    (_, colunaIndex) => {
-      let maior = 0;
-
-      dados.forEach((linha) => {
-        const valor = linha[colunaIndex];
-
-        if (valor !== undefined && valor !== null) {
-          maior = Math.max(
-            maior,
-            String(valor).length
-          );
-        }
-      });
-
-      return {
-        wch: Math.min(
-          Math.max(maior + 2, 10),
-          50
-        )
-      };
-    }
-  );
-
-  worksheet["!cols"] = larguras;
-
-  // Gera o arquivo e inicia o download
-  XLSX.writeFile(
-    workbook,
-    nomeArquivo,
-    {
-      bookType: "xlsx"
-    }
-  );
+  XLSX.writeFile(workbook, nomeArquivo, {
+    bookType: "xlsx"
+  });
 }
 
 /**
@@ -300,43 +287,16 @@ export async function converterXmlParaExcel(file) {
   }
 
   const descritor = lerDescritor(xmlDoc);
+  const domicilios = lerDomiciliosBancarios(xmlDoc);
 
-  const domicilios =
-    lerDomiciliosBancarios(xmlDoc);
+  const nomeArquivo = file.name.replace(/\.xml$/i, ".xlsx");
 
-  const resultado = montarDados(
-    descritor,
-    domicilios
-  );
-
-  /*
-   * Remove a extensão original.
-   *
-   * Exemplo:
-   *
-   * 201_01_Conc_Bancaria.xml
-   *
-   * vira:
-   *
-   * 201_01_Conc_Bancaria.xlsx
-   */
-  const nomeArquivo =
-    file.name.replace(
-      /\.xml$/i,
-      ".xlsx"
-    );
-
-  gerarExcel(
-    resultado.dados,
-    nomeArquivo
-  );
+  gerarExcel(descritor, domicilios, nomeArquivo);
 
   return {
     nomeArquivo,
-    quantidadeRegistros:
-      domicilios.length,
-    quantidadeColunas:
-      resultado.colunas.length,
-    colunas: resultado.colunas
+    quantidadeRegistros: domicilios.length,
+    quantidadeColunas: Object.keys(domicilios[0] ?? {}).length,
+    colunas: Object.keys(domicilios[0] ?? {})
   };
 }
